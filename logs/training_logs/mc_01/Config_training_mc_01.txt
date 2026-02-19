@@ -1,0 +1,75 @@
+bodies = [
+    # Masses
+    np.array([
+        5.972e24,       # Earth
+        1.0e5,          # Ship
+    ]),
+    # Positions (x, y) in meters
+    np.array([
+        [0.0, 0.0],                # Earth
+        [2e6, 0.0],        # Ship
+    ]),
+    # Velocities (vx, vy) in m/s
+    np.array([
+        [0.0, 0.0],                   # Earth
+        [0.0, 14000.0],         # Ship
+    ]),
+    # Names of celestial bodies
+    np.array([
+        "Earth",
+        "Ship"
+    ]),
+    # Colors for visuals
+    np.array([
+        "blue",       # Earth
+        "lightblue",  # Ship
+    ]),
+]
+actions = simple_action_space 
+safety_radius = 1e4,
+escape_dist = 1e8,   
+escape_vel = 4e5,
+target_dist = 3.6e7 
+target_vel = 3055.0
+reference_point_index = 0
+
+n_actions = actions.n
+n_episodes=1000
+
+dt=0.1
+simulation_time = 3600 * 1 * 1
+max_steps= int(simulation_time/dt)
+
+reward_coef = 1.0 / max_steps
+
+thrust = 1e6/dt
+
+log_every=10
+log_n_entries=400
+
+
+# Tangentiality reward
+r += 1.0 * tangential_reward * self.reward_coef
+
+# Time pressure (very small, always on)
+r -= 0.2 * self.reward_coef
+
+# Distance shaping
+dist_reward = 1.0 / (1.0 + dist_error)
+r += 2.0 * dist_reward * self.reward_coef
+
+# Thrust / acceleration penalty
+if self.last_action != 0:
+    r -= 0.2 * self.reward_coef
+
+# Terminal conditions
+# success
+if dist_error < 0.05 and vel_error < 0.1 and rad_mag < 0.1:
+    r += 10.0
+# crash
+if self.rel_x < self.safety_radius:
+    r -= 2.0
+
+# escape (distance OR velocity)
+if self.rel_x > self.escape_dist or self.rel_v > self.escape_vel:
+    r -= 2.0
