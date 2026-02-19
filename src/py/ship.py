@@ -210,26 +210,23 @@ class SimpleImpulseShip(IShip):
         r = 0.0
 
         # Tangentiality reward
-        rad_mag = abs(self.radial_alignment)
-        tangential_reward = 1.0 - rad_mag
-        r += 1.0 * tangential_reward * self.reward_coef # 0 perpendicular, 1 moving out, -1 mowing in
+        rad_mag = abs(self.radial_alignment) # 0 perpendicular, 1 moving out or mowing in
+        r -= 1.0 * rad_mag * self.reward_coef 
         
         # Time pressure (very small, always on)
         r -= 0.2 * self.reward_coef
 
         # Distance shaping
-        dist_reward = 1.0 / (1.0 + dist_error)
-        r += 2.0 * dist_reward * self.reward_coef
+        r -= 2.0 * dist_error * self.reward_coef
 
-        #dist_progress = self.prev_rel_x - self.rel_x
+        #dist_progress = (self.prev_rel_x - self.rel_x) / (self.rel_x + 1e-8)
         #r += 1.0 * dist_progress * self.reward_coef
         #self.prev_rel_x = self.rel_x
     
         # Velocity  
-        #vel_reward = 1.0 / (1.0 + vel_error)
-        #r += 0.3 * vel_reward * self.reward_coef
+        r -= 0.3 * vel_error * self.reward_coef
 
-        #vel_progress = self.prev_rel_v - self.rel_v
+        #vel_progress = (self.prev_rel_v - self.rel_v) / (self.rel_v + 1e-8)
         #r += 0.1 * vel_progress * self.reward_coef
         #self.prev_rel_v = self.rel_v
     
@@ -247,14 +244,14 @@ class SimpleImpulseShip(IShip):
     
         # crash
         if self.rel_x < self.safety_radius:
-            r -= 2.0
+            r -= 4.0
             self.done_flag = True
             print("Failure: Ship crashed")
             return r
     
         # escape (distance OR velocity)
         if self.rel_x > self.escape_dist or self.rel_v > self.escape_vel:
-            r -= 2.0
+            r -= 4.0
             self.done_flag = True
             print("Failure: Ship escaped the system or exceeded system escape velocity")
             return r

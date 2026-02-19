@@ -168,6 +168,14 @@ def load_states(path):
     # Case 3: single state
     return convert_state(states)
 
+def save_loglist(path, loglist):
+    with open(path, "w") as f:
+        json.dump(loglist, f)
+
+def load_loglist(path):
+    with open(path, "r") as f:
+        loglist = json.load(f)
+    return loglist
 """
 # old with no nested lists loader
 def load_states(path):

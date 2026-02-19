@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Categorical
 from line_profiler import LineProfiler, profile
-from helpers import save_states
+from helpers import save_states, save_loglist
 import time
 import statistics
 import os
@@ -53,6 +53,7 @@ class MonteCarloAgent:
         #print("Started episode")
         log_probs = []
         rewards = []
+        episode_actions = []
 
         obs = env.reset()
         obs = torch.tensor(obs, dtype=torch.float32, device=self.device)
@@ -74,6 +75,8 @@ class MonteCarloAgent:
             else:
                 _, _, _, next_obs, reward, done = env.step(action.item())
 
+            episode_actions.append(action.item())
+
             #print(f"Log prob: {log_prob}")
             #print(f"Next_obs: {next_obs}")
             #print(f"Reward: {reward}")
@@ -94,9 +97,9 @@ class MonteCarloAgent:
                 
         #print("Finished episode")
         if log_states:
-            return log_probs, rewards, states
+            return log_probs, rewards, episode_actions, states
         else: 
-            return log_probs, rewards
+            return log_probs, rewards, episode_actions
 
     @profile
     def update_policy(self, log_probs, rewards):
@@ -118,45 +121,29 @@ class MonteCarloAgent:
 
 def train_mc(env, agent, n_episodes=1000, max_steps=100000, log_every=10, log_states=False, log_n_entries=400):
     states_list = []
-    for ep in range(1, n_episodes + 1):
-        if log_states and ep % log_every == 0:
-            log_probs, rewards, states = agent.run_episode(env, max_steps, log_states, log_n_entries)
-        else:
-            log_probs, rewards = agent.run_episode(env, max_steps)
-        
-        loss = agent.update_policy(log_probs, rewards)
-        #print("Updated policy")
-
-        total_reward = sum(rewards)
-
-        if ep % log_every == 0:
-            print(
-                f"Episode {ep:4d} | "
-                f"Return: {total_reward: .3e} | "
-                f"Loss: {loss: .3e}"
-            )
-            if log_states:
-                states_list.append(states)
-                save_states(f"training_logs/mc_{n_episodes}_{max_steps}/episode{ep}.json", states)
-
-    return states_list
-
-
-
-
-def train_mc(env, agent, n_episodes=1000, max_steps=100000, log_every=10, log_states=False, log_n_entries=400):
-    states_list = []
+    rewards_log = []
+    actions_log = []
     elapsed_times = []
+    # convergence 
+    alpha = 0.1
+    tol = 0.0001
+    ema_reward = None
+
     folder = f"training_logs/mc_{n_episodes}_{max_steps}"
-    os.makedirs(folder, exist_ok=True)
+    episodes_folder = os.path.join(folder,"episodes")
+    rewards_folder = os.path.join(folder,"rewards")
+    actions_folder = os.path.join(folder,"actions")
+    os.makedirs(episodes_folder, exist_ok=True)
+    os.makedirs(rewards_folder, exist_ok=True)
+    os.makedirs(actions_folder, exist_ok=True)
 
     for ep in range(1, n_episodes + 1):
         start = time.perf_counter()  # start timer
 
         if log_states and ep % log_every == 0:
-            log_probs, rewards, states = agent.run_episode(env, max_steps, log_states, log_n_entries)
+            log_probs, rewards, episode_actions, states = agent.run_episode(env, max_steps, log_states, log_n_entries)
         else:
-            log_probs, rewards = agent.run_episode(env, max_steps)
+            log_probs, rewards, episode_actions, = agent.run_episode(env, max_steps)
         
         loss = agent.update_policy(log_probs, rewards)
         total_reward = sum(rewards)
@@ -176,7 +163,22 @@ def train_mc(env, agent, n_episodes=1000, max_steps=100000, log_every=10, log_st
             )
 
             if log_states:
-                states_list.append(states)
-                save_states(os.path.join(folder, f"episode{ep}.json"), states)
+                states_list.append(states)      
+                rewards_log.append(total_reward)
+                actions_log.append(episode_actions)
+                save_states(os.path.join(episodes_folder, f"episode{ep}.json"), states)
+                save_loglist(os.path.join(folder, f"rewards{ep}.json"), total_reward)
+                save_loglist(os.path.join(folder, f"actions{ep}.json"), episode_actions)
 
-    return states_list
+        # convergence check
+        if ema_reward is None:
+            ema_reward = total_reward
+        else:
+            prev_ema = ema_reward
+            ema_reward = alpha * total_reward + (1 - alpha) * ema_reward
+
+            if abs(ema_reward - prev_ema) < tol:
+                print(f"Converged at episode {ep}")
+                break
+
+    return states_list, rewards_log, actions_log
