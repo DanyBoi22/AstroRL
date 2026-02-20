@@ -3,6 +3,7 @@
 
 import numpy as np
 import json
+import os
 
 # Some helpers
 DAY   = 24 * 3600.0
@@ -176,17 +177,28 @@ def load_loglist(path):
     with open(path, "r") as f:
         loglist = json.load(f)
     return loglist
-"""
-# old with no nested lists loader
-def load_states(path):
-    with open(path, "r") as f:
-        states = json.load(f)
 
-    # Optional: convert back to NumPy
-    for s in states:
-        s["x"] = np.array(s["x"])
-        s["v"] = np.array(s["v"])
-        s["a"] = np.array(s["a"])
-        s["m"] = np.array(s["m"])
-    return states
-"""
+def append_to_json_list(path, item):
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            data = json.load(f)
+    else:
+        data = []
+
+    data.append(item)
+
+    with open(path, "w") as f:
+        json.dump(data, f)
+
+
+def append_batch_to_json_list(path, items):
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            data = json.load(f)
+    else:
+        data = []
+
+    data.extend(items)
+
+    with open(path, "w") as f:
+        json.dump(data, f)

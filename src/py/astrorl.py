@@ -13,7 +13,8 @@ from forcemodel import IForceModel, GravityForce
 from integrator import IIntegrator, SymplecticEuler, VelocityVerlet
 from env import SolarSystemEnv, run_simulation, run_script_simulation, adjust_barycentric
 from ship import SimpleImpulseShip, Maneuver, simple_action_space, IShip
-from rlmontecarlo import train_mc, MonteCarloAgent, PolicyNet, compute_returns
+from rlmontecarlo import train_mc, MonteCarloAgent
+from rlactorcritic import train_ac, ActorCriticAgent
 
 @dataclass
 class TrainingConfig:
@@ -36,7 +37,7 @@ class TrainingConfig:
     reference_point_index: int
     reward_coef: float
 
-def run_training(forcemodel: IForceModel, integrator: IIntegrator, iship: IShip, iagent: MonteCarloAgent, training_config: TrainingConfig):
+def run_training_mc(forcemodel: IForceModel, integrator: IIntegrator, iship: IShip, iagent: MonteCarloAgent, training_config: TrainingConfig):
     ship_kwargs = {k: getattr(training_config, k) for k in [
         "ship_index", "mass", "thrust", "actions",
         "safety_radius", "escape_dist", "escape_vel",
@@ -54,6 +55,24 @@ def run_training(forcemodel: IForceModel, integrator: IIntegrator, iship: IShip,
     
     return states
 
+def run_training_ac(forcemodel: IForceModel, integrator: IIntegrator, iship: IShip, iagent: ActorCriticAgent, training_config: TrainingConfig):
+    ship_kwargs = {k: getattr(training_config, k) for k in [
+        "ship_index", "mass", "thrust", "actions",
+        "safety_radius", "escape_dist", "escape_vel",
+        "target_dist", "target_vel", "reference_point_index",
+        "reward_coef"
+    ]}
+    ship = iship(**ship_kwargs)
+
+    env = SolarSystemEnv(forcemodel, integrator, bodies=training_config.bodies, ship=ship, dt=training_config.dt)
+    obs0 = env.reset()
+    obs_dim = obs0.shape[0]
+    
+    agent = iagent(obs_dim, n_actions=training_config.actions.n)
+    states = train_ac(env, agent, n_episodes=training_config.n_episodes, max_steps=training_config.max_steps, log_every=training_config.log_every, log_states=training_config.log_states, log_n_entries=training_config.log_n_entries)
+    
+    return states
+
 def main():
     bodies = [
         np.array([      # Masses in kg
@@ -66,7 +85,7 @@ def main():
         ]),
         np.array([      # Velocities (vx, vy) in m/s
             [0.0, 0.0],
-            [0.0, 14000.0],
+            [0.0, 1.4e4],
         ]),
         np.array([      # Names of bodies
             "Earth",
@@ -111,10 +130,15 @@ def main():
     forcemodel = GravityForce
     integrator = VelocityVerlet
     ship = SimpleImpulseShip
-    agent = MonteCarloAgent
-
-    states, reward_log, actions_log = run_training(forcemodel, integrator, ship, agent, training_config)
-
+    agent = ActorCriticAgent
+    
+    # Dumbest hardcoding ive ever done, dont judge me i had no time
+    if agent == MonteCarloAgent:
+        states, reward_log, actions_log = run_training_mc(forcemodel, integrator, ship, agent, training_config)
+    elif agent == ActorCriticAgent:
+        states, reward_log, actions_log = run_training_ac(forcemodel, integrator, ship, agent, training_config)
+    else:
+        print("plop")
 
 if __name__ == "__main__":
     main()

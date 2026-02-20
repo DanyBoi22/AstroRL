@@ -2,8 +2,10 @@
 # coding: utf-8
 
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from helpers import load_states 
 
 
 def visualize_trajectories(states, body_names, colors=None, scale=1.0/1.496e11, centre_body=None, trail_length=50, xlim=(-10,10), ylim=(-10,10), interval=50, save_path=None, xlabel="x (scaled)", ylabel="y (scaled)", title="Celestial Trajectories"):
@@ -157,3 +159,28 @@ def plot_static_trajectories(states, body_names, colors=None, scale=1.0/1.496e11
     if save_path is not None:
         plt.savefig(save_path) 
     plt.show()
+
+
+def show_training_eposides_plots_hohmann_hardcode(path):
+    bodies = [np.array([5.972e24, 1.0e5,]),
+        np.array([[0.0, 0.0],[2e6, 0.0],]),
+        np.array([[0.0, 0.0],[0.0, 14000.0],]),
+        np.array(["Earth","Ship"]),
+        np.array([ "blue","lightblue",]),]
+    centre_body="Earth"
+    scale=1.0/1e3
+    xlim=(-1e4, 1e4)
+    ylim=(-1e4, 1e4)
+    xlabel="x [km]"
+    ylabel="y [km]"
+    
+    #path = "../../logs/training_logs/mc_800_36000_5/episodes"
+    
+    # Get all JSON files sorted
+    json_files = sorted([f for f in os.listdir(path) if f.endswith(".json")])
+    
+    # Iterate through each file
+    for fname in json_files:
+        fpath = os.path.join(path, fname)
+        states = load_states(fpath)
+        plot_static_trajectories(states=states, body_names=bodies[3], colors=bodies[4], scale=scale, centre_body=centre_body, xlim=xlim, ylim=ylim, xlabel=xlabel, ylabel=ylabel)

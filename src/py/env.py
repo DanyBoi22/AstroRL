@@ -68,11 +68,11 @@ class SolarSystemEnv:
         if self.ship:
             obs = self.ship.observe(self.x, self.v, self.a)
             reward = self.ship.reward(self.x, self.v, self.a) 
-            done = self.ship.done(self.x, self.v, self.a)
+            done, success = self.ship.done(self.x, self.v, self.a)
         else:
-            obs, reward, done = None, None, None
+            obs, reward, done, success = None, None, None, None
         
-        return self.x, self.v, self.a, obs, reward, done
+        return self.x, self.v, self.a, obs, reward, done, success
 
 
 def run_script_simulation(force_model: IForceModel, integrator: IIntegrator, bodies, ship: IShip | None = None, maneuvers: list[Maneuver] | None = None, dt=180.0, n_steps=100000, records_len=600):
@@ -88,7 +88,7 @@ def run_script_simulation(force_model: IForceModel, integrator: IIntegrator, bod
         t = env.t
 
         action = action_from_maneuvers(t, maneuvers)
-        x, v, a, obs, reward, done = env.step(action)
+        x, v, a, obs, reward, done, success = env.step(action)
 
         if i % step == 0:
             states.append(make_step_state(env.m, x, v, a, env.t))
@@ -107,7 +107,7 @@ def run_simulation(force_model: IForceModel, integrator: IIntegrator, bodies, sh
     env.reset()
 
     for i in range(n_steps):
-        x, v, a, obs, reward, done = env.step()
+        x, v, a, obs, reward, done, success = env.step()
         env_state = make_step_state(env.m, x, v, a, env.t)
         
         # record every nth step

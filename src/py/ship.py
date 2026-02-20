@@ -128,12 +128,15 @@ class SimpleImpulseShip(IShip):
         self.mass = mass if mass > 0 else 0.00000001
         self.actions = actions
         self.done_flag = False
+        self.success_flag = False
 
         self.last_action = None
-        self.prev_rel_x = None
-        self.prev_rel_v = None
-        self.rel_x = None
-        self.rel_v = None
+        self.prev_rel_dist = None
+        self.prev_rel_vel = None
+        self.rel_dist = None
+        self.rel_vel = None
+        self.dist_norm = None
+        self.vel_norm = None
         self.radial_alignment = None
 
         if escape_dist is not None:
@@ -165,11 +168,14 @@ class SimpleImpulseShip(IShip):
     
     def reset(self, x, v, a):
         self.done_flag = False
+        self.success_flag = False
         self.last_action = None
-        self.prev_rel_x = None
-        self.prev_rel_v = None
-        self.rel_x = None
-        self.rel_v = None
+        self.prev_rel_dist = None
+        self.prev_rel_vel = None
+        self.rel_dist = None
+        self.rel_vel = None
+        self.dist_norm = None
+        self.vel_norm = None
         self.radial_alignment = None
 
     
@@ -182,75 +188,82 @@ class SimpleImpulseShip(IShip):
         if self.reference_point_index is None:
             return np.concatenate([x[self.ship_index], v[self.ship_index], np.array([np.linalg.norm(x[self.ship_index])]), np.array([np.linalg.norm(v[self.ship_index])]), np.array([0])])
         
-        rel_x_vec = x[self.ship_index] - x[self.reference_point_index] # relative distance vector
+        rel_x_vec = x[self.ship_index] - x[self.reference_point_index] # relative position vector
         rel_v_vec = v[self.ship_index] - v[self.reference_point_index] # relative velocity vector
 
-        self.rel_x = np.linalg.norm(rel_x_vec) # relative distance 
-        self.rel_v = np.linalg.norm(rel_v_vec) # relative velocity magnitude
+        self.rel_dist = np.linalg.norm(rel_x_vec) # relative distance 
+        self.rel_vel = np.linalg.norm(rel_v_vec) # relative speed
 
-        x_norm = rel_x_vec / (self.rel_x + 1e-8) # normalised 
-        v_norm = rel_v_vec / (self.rel_v + 1e-8) # normalised 
+        x_norm = rel_x_vec / (self.rel_dist + 1e-8) # normalised relative position vector
+        v_norm = rel_v_vec / (self.rel_vel + 1e-8) # normalised relative velocity vector
+
+        self.dist_norm = (self.rel_dist - self.target_dist) / (self.target_dist + 1e-8) # normalised relative distance 
+        self.vel_norm  = (self.rel_vel - self.target_vel) / (self.target_vel + 1e-8) # normalised relative speed
 
         self.radial_alignment = np.dot(v_norm, x_norm) # 0 perpendicular, 1 moving out, -1 mowing in
         
         # initialize memory
-        if self.prev_rel_x is None:
-            self.prev_rel_x = self.rel_x
-        if self.prev_rel_v is None:
-            self.prev_rel_v = self.rel_v
+        if self.prev_rel_dist is None:
+            self.prev_rel_dist = self.rel_dist
+        if self.prev_rel_vel is None:
+            self.prev_rel_vel = self.rel_vel
     
-        return np.concatenate([x_norm, v_norm, np.array([self.rel_x]), np.array([self.rel_v]), np.array([self.radial_alignment])])
+        return np.concatenate([x_norm, v_norm, np.array([self.dist_norm]), np.array([self.vel_norm]), np.array([self.radial_alignment])])
 
     def reward(self, x, v, a):    
         #self.reward_coef: total episode reward magnitude ≈ O(1)  so 1.0 / self.max_steps
 
-        dist_error = abs(self.rel_x - self.target_dist) / (self.target_dist + 1e-8)
-        vel_error  = abs(self.rel_v - self.target_vel) / (self.target_vel + 1e-8)
+        dist_error = abs(self.dist_norm)
+        vel_error  = abs(self.vel_norm)
+        rad_mag = abs(self.radial_alignment)  # 0 perpendicular, 1 moving out or mowing in
     
         r = 0.0
 
         # Tangentiality reward
-        rad_mag = abs(self.radial_alignment) # 0 perpendicular, 1 moving out or mowing in
-        r -= 1.0 * rad_mag * self.reward_coef 
+        r += 1.0 * (1- rad_mag) 
         
         # Time pressure (very small, always on)
-        r -= 0.2 * self.reward_coef
+        r -= 0.2
 
         # Distance shaping
-        r -= 2.0 * dist_error * self.reward_coef
+        r += 2.0 * (1- dist_error)
 
-        #dist_progress = (self.prev_rel_x - self.rel_x) / (self.rel_x + 1e-8)
-        #r += 1.0 * dist_progress * self.reward_coef
-        #self.prev_rel_x = self.rel_x
+        #dist_progress = (self.prev_rel_dist - self.rel_dist) / (self.rel_dist + 1e-8)
+        #r += 1.0 * dist_progress
+        #self.prev_rel_dist = self.rel_dist
     
         # Velocity  
-        r -= 0.3 * vel_error * self.reward_coef
+        r += 0.3 * (1- vel_error)
 
-        #vel_progress = (self.prev_rel_v - self.rel_v) / (self.rel_v + 1e-8)
-        #r += 0.1 * vel_progress * self.reward_coef
-        #self.prev_rel_v = self.rel_v
+        #vel_progress = (self.prev_rel_vel - self.rel_vel) / (self.rel_vel + 1e-8)
+        #r += 0.1 * vel_progress
+        #self.prev_rel_vel = self.rel_vel
     
         # Thrust / acceleration penalty
         if self.last_action != 0:
-            r -= 0.2 * self.reward_coef
-    
+            r -= 0.2
+
+        # Apply reward normalisation
+        r = r * self.reward_coef
+
         # Terminal conditions
         # success
         if dist_error < 0.05 and vel_error < 0.1 and rad_mag < 0.1:
             r += 10.0
             self.done_flag = True
+            self.success_flag = True
             print("Success: Ship reached the target")
             return r
     
         # crash
-        if self.rel_x < self.safety_radius:
+        if self.rel_dist < self.safety_radius:
             r -= 4.0
             self.done_flag = True
             print("Failure: Ship crashed")
             return r
     
         # escape (distance OR velocity)
-        if self.rel_x > self.escape_dist or self.rel_v > self.escape_vel:
+        if self.rel_dist > self.escape_dist or self.rel_vel > self.escape_vel:
             r -= 4.0
             self.done_flag = True
             print("Failure: Ship escaped the system or exceeded system escape velocity")
@@ -259,5 +272,4 @@ class SimpleImpulseShip(IShip):
         return r
     
     def done(self, x, v, a):
-        return self.done_flag
-
+        return self.done_flag, self.success_flag

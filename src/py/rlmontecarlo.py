@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Categorical
 from line_profiler import LineProfiler, profile
-from helpers import save_states, save_loglist
+from helpers import save_states, append_batch_to_json_list
 import time
 import statistics
 import os
@@ -70,10 +70,10 @@ class MonteCarloAgent:
             log_prob = dist.log_prob(action)
             
             if log_states and i % step == 0:
-                x, v, a, next_obs, reward, done = env.step(action.item())
+                x, v, a, next_obs, reward, done, success = env.step(action.item())
                 states.append({"m": env.m, "x": x, "v": v, "a": a, "t": env.t})
             else:
-                _, _, _, next_obs, reward, done = env.step(action.item())
+                _, _, _, next_obs, reward, done, success = env.step(action.item())
 
             episode_actions.append(action.item())
 
@@ -85,7 +85,6 @@ class MonteCarloAgent:
             log_probs.append(log_prob)
             rewards.append(reward)
 
-            next_obs = np.clip(next_obs, -5.0, 5.0)
             obs = torch.tensor(next_obs, dtype=torch.float32, device=self.device)
 
             if done:
@@ -97,9 +96,9 @@ class MonteCarloAgent:
                 
         #print("Finished episode")
         if log_states:
-            return log_probs, rewards, episode_actions, states
+            return log_probs, rewards, episode_actions, success, states
         else: 
-            return log_probs, rewards, episode_actions
+            return log_probs, rewards, episode_actions, success
 
     @profile
     def update_policy(self, log_probs, rewards):
@@ -120,55 +119,80 @@ class MonteCarloAgent:
 
 
 def train_mc(env, agent, n_episodes=1000, max_steps=100000, log_every=10, log_states=False, log_n_entries=400):
-    states_list = []
-    rewards_log = []
-    actions_log = []
-    elapsed_times = []
+    action_buffer = []
+    metadata_buffer = []
+    reward_buffer = []
+    times_buffer = []
+    
     # convergence 
     alpha = 0.1
     tol = 0.0001
     ema_reward = None
 
+    # logging
     folder = f"training_logs/mc_{n_episodes}_{max_steps}"
-    episodes_folder = os.path.join(folder,"episodes")
-    rewards_folder = os.path.join(folder,"rewards")
-    actions_folder = os.path.join(folder,"actions")
+    actions_file = os.path.join(folder, "actions.json")
+    metadata_file = os.path.join(folder, "metadata.json")
+    
+    episodes_folder = os.path.join(folder, "episodes")
     os.makedirs(episodes_folder, exist_ok=True)
-    os.makedirs(rewards_folder, exist_ok=True)
-    os.makedirs(actions_folder, exist_ok=True)
+
+
+    def flush_buffers():
+        append_batch_to_json_list(actions_file, action_buffer)
+        append_batch_to_json_list(metadata_file, metadata_buffer)
+
+        action_buffer.clear()
+        metadata_buffer.clear()
+        
+        reward_buffer.clear()
+        times_buffer.clear()
+
+
+    def save_episode_states(ep, states):
+        save_states(os.path.join(episodes_folder, f"episode{ep}.json"), states)
+
 
     for ep in range(1, n_episodes + 1):
-        start = time.perf_counter()  # start timer
+        start = time.perf_counter()
 
         if log_states and ep % log_every == 0:
-            log_probs, rewards, episode_actions, states = agent.run_episode(env, max_steps, log_states, log_n_entries)
+            log_probs, rewards, episode_actions, success, states = agent.run_episode(env, max_steps, log_states, log_n_entries)
         else:
-            log_probs, rewards, episode_actions, = agent.run_episode(env, max_steps)
+            log_probs, rewards, episode_actions, success = agent.run_episode(env, max_steps)
         
         loss = agent.update_policy(log_probs, rewards)
         total_reward = sum(rewards)
 
-        end = time.perf_counter()  # end timer
+        end = time.perf_counter()
         elapsed = end - start
-        elapsed_times.append(elapsed)
+        
+        times_buffer.append(elapsed)
+        reward_buffer.append(total_reward)
 
-        if ep % log_every == 0:
-            mean_elapsed = statistics.mean(elapsed_times)
-            elapsed_times = []
-            print(
-                f"Episode {ep:4d} | "
-                f"Return: {total_reward: .3e} | "
-                f"Loss: {loss: .3e} | "
-                f"Mean elapsed time per episode: {mean_elapsed:.3f} s"
-            )
+        if log_states:
+            action_buffer.append(episode_actions)
+            metadata_buffer.append({
+                "episode": ep,
+                "reward": total_reward,
+                "loss": loss,
+                "success": success,
+                "time": elapsed,
+            })
 
-            if log_states:
-                states_list.append(states)      
-                rewards_log.append(total_reward)
-                actions_log.append(episode_actions)
-                save_states(os.path.join(episodes_folder, f"episode{ep}.json"), states)
-                save_loglist(os.path.join(folder, f"rewards{ep}.json"), total_reward)
-                save_loglist(os.path.join(folder, f"actions{ep}.json"), episode_actions)
+            if ep % log_every == 0:
+                mean_elapsed = statistics.mean(times_buffer)
+                mean_rewards = np.mean(reward_buffer)
+
+                print(
+                    f"Episode {ep:4d} | "
+                    f"Mean return per episode: {mean_rewards: .3e} | "
+                    f"Mean elapsed time per episode: {mean_elapsed:.3f} s"
+                )
+
+                flush_buffers()
+                save_episode_states(ep, states)
+                states = None
 
         # convergence check
         if ema_reward is None:
@@ -179,6 +203,11 @@ def train_mc(env, agent, n_episodes=1000, max_steps=100000, log_every=10, log_st
 
             if abs(ema_reward - prev_ema) < tol:
                 print(f"Converged at episode {ep}")
+
+                if log_states:
+                    flush_buffers()
+                    if states is not None:
+                        save_episode_states(ep, states)
                 break
 
-    return states_list, rewards_log, actions_log
+        #success_rate = sum(m["finish"] == "success" for m in metadata) / len(metadata)
