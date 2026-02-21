@@ -95,7 +95,8 @@ class ActorCriticAgent:
                 break
 
             # exceeded max episode steps
-            if i >= max_steps:
+            if i+1 >= max_steps:
+                print("Failure: Time limit reached")
                 break
 
         # ensure obs has batch dimension for next_value
@@ -145,7 +146,7 @@ def train_ac(env, agent, n_episodes=1000, max_steps=100000, log_every=10, log_st
     ema_reward = None
 
     # logging
-    folder = f"training_logs/mc_{n_episodes}_{max_steps}"
+    folder = f"training_logs/ac_{n_episodes}_{max_steps}"
     actions_file = os.path.join(folder, "actions.json")
     metadata_file = os.path.join(folder, "metadata.json")
     

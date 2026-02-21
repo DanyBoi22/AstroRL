@@ -248,7 +248,7 @@ class SimpleImpulseShip(IShip):
 
         # Terminal conditions
         # success
-        if dist_error < 0.05 and vel_error < 0.1 and rad_mag < 0.1:
+        if dist_error < 0.05 and vel_error < 0.05 and rad_mag < 0.01:
             r += 10.0
             self.done_flag = True
             self.success_flag = True

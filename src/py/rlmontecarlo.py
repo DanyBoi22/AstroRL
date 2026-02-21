@@ -76,12 +76,6 @@ class MonteCarloAgent:
                 _, _, _, next_obs, reward, done, success = env.step(action.item())
 
             episode_actions.append(action.item())
-
-            #print(f"Log prob: {log_prob}")
-            #print(f"Next_obs: {next_obs}")
-            #print(f"Reward: {reward}")
-            #print(f"Done: {done}")
-            
             log_probs.append(log_prob)
             rewards.append(reward)
 
@@ -91,7 +85,8 @@ class MonteCarloAgent:
                 break
 
             # exceeded max episode steps
-            if i >= max_steps:
+            if i+1 >= max_steps:
+                print("Failure: Time limit reached")
                 break
                 
         #print("Finished episode")

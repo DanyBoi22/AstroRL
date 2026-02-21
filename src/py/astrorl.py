@@ -74,6 +74,7 @@ def run_training_ac(forcemodel: IForceModel, integrator: IIntegrator, iship: ISh
     return states
 
 def main():
+    earth_radius = 6.371e6
     bodies = [
         np.array([      # Masses in kg
             5.972e24,       # Earth
@@ -81,11 +82,11 @@ def main():
         ]),
         np.array([      # Positions (x, y) in meters
             [0.0, 0.0],
-            [2e6, 0.0], 
+            [earth_radius + 2e6, 0.0], 
         ]),
         np.array([      # Velocities (vx, vy) in m/s
             [0.0, 0.0],
-            [0.0, 1.4e4],
+            [0.0, 6.9e3],
         ]),
         np.array([      # Names of bodies
             "Earth",
@@ -97,8 +98,8 @@ def main():
         ]),
     ]
 
-    dt = 0.1
-    simulation_time = 3600 * 1 * 1  # seconds
+    dt = 1
+    simulation_time = 10500 * 1 * 1  # seconds
     max_steps = int(simulation_time / dt)
 
     ship_index = len(bodies[0])-1
@@ -117,12 +118,12 @@ def main():
         ship_index=ship_index,
         mass=mass,
         thrust=thrust,
-        actions=simple_action_space,
-        safety_radius=1e5,
+        actions=simple_action_space, # 4 directions + no thrust
+        safety_radius=earth_radius + 1e5, # 100km is an atmo entry
         escape_dist=1e8,
-        escape_vel=4e5,
-        target_dist=4e6,
-        target_vel=3055.0,
+        escape_vel=1e5,
+        target_dist=earth_radius + 4e6,
+        target_vel=6.2e3,
         reference_point_index=0,
         reward_coef=reward_coef
     )
@@ -134,9 +135,9 @@ def main():
     
     # Dumbest hardcoding ive ever done, dont judge me i had no time
     if agent == MonteCarloAgent:
-        states, reward_log, actions_log = run_training_mc(forcemodel, integrator, ship, agent, training_config)
+        run_training_mc(forcemodel, integrator, ship, agent, training_config)
     elif agent == ActorCriticAgent:
-        states, reward_log, actions_log = run_training_ac(forcemodel, integrator, ship, agent, training_config)
+        run_training_ac(forcemodel, integrator, ship, agent, training_config)
     else:
         print("plop")
 
