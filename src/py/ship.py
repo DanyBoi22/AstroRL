@@ -211,6 +211,9 @@ class SimpleImpulseShip(IShip):
         return np.concatenate([x_norm, v_norm, np.array([self.dist_norm]), np.array([self.vel_norm]), np.array([self.radial_alignment])])
 
     def reward(self, x, v, a):    
+        if self.reference_point_index is None:
+            return 0
+        
         #self.reward_coef: total episode reward magnitude ≈ O(1)  so 1.0 / self.max_steps
 
         dist_error = abs(self.dist_norm)

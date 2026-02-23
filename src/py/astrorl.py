@@ -105,7 +105,7 @@ def main():
     ship_index = len(bodies[0])-1
     mass = bodies[0][ship_index]
     reward_coef = 1.0 / max_steps
-    thrust = 1e6 / dt
+    thrust = 1e6 * dt
 
     training_config = TrainingConfig(
         bodies=bodies,
