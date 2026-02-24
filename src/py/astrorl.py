@@ -2,6 +2,8 @@
 # coding: utf-8
 
 import numpy as np
+import random
+import torch
 import math
 import json
 import time
@@ -37,7 +39,7 @@ class TrainingConfig:
     reference_point_index: int
     reward_coef: float
 
-def run_training_mc(forcemodel: IForceModel, integrator: IIntegrator, iship: IShip, iagent: MonteCarloAgent, training_config: TrainingConfig):
+def run_training_mc(forcemodel: IForceModel, integrator: IIntegrator, iship: IShip, iagent: MonteCarloAgent, training_config: TrainingConfig, root_folder: str):
     ship_kwargs = {k: getattr(training_config, k) for k in [
         "ship_index", "mass", "thrust", "actions",
         "safety_radius", "escape_dist", "escape_vel",
@@ -51,11 +53,9 @@ def run_training_mc(forcemodel: IForceModel, integrator: IIntegrator, iship: ISh
     obs_dim = obs0.shape[0]
     
     agent = iagent(obs_dim, n_actions=training_config.actions.n)
-    states = train_mc(env, agent, n_episodes=training_config.n_episodes, max_steps=training_config.max_steps, log_every=training_config.log_every, log_states=training_config.log_states, log_n_entries=training_config.log_n_entries)
-    
-    return states
+    train_mc(env, agent, n_episodes=training_config.n_episodes, max_steps=training_config.max_steps, log_every=training_config.log_every, log_states=training_config.log_states, log_n_entries=training_config.log_n_entries, root_folder=root_folder)
 
-def run_training_ac(forcemodel: IForceModel, integrator: IIntegrator, iship: IShip, iagent: ActorCriticAgent, training_config: TrainingConfig):
+def run_training_ac(forcemodel: IForceModel, integrator: IIntegrator, iship: IShip, iagent: ActorCriticAgent, training_config: TrainingConfig, root_folder: str):
     ship_kwargs = {k: getattr(training_config, k) for k in [
         "ship_index", "mass", "thrust", "actions",
         "safety_radius", "escape_dist", "escape_vel",
@@ -69,9 +69,7 @@ def run_training_ac(forcemodel: IForceModel, integrator: IIntegrator, iship: ISh
     obs_dim = obs0.shape[0]
     
     agent = iagent(obs_dim, n_actions=training_config.actions.n)
-    states = train_ac(env, agent, n_episodes=training_config.n_episodes, max_steps=training_config.max_steps, log_every=training_config.log_every, log_states=training_config.log_states, log_n_entries=training_config.log_n_entries)
-    
-    return states
+    train_ac(env, agent, n_episodes=training_config.n_episodes, max_steps=training_config.max_steps, log_every=training_config.log_every, log_states=training_config.log_states, log_n_entries=training_config.log_n_entries, root_folder=root_folder)
 
 def main():
     earth_radius = 6.371e6
@@ -131,15 +129,24 @@ def main():
     forcemodel = GravityForce
     integrator = VelocityVerlet
     ship = SimpleImpulseShip
-    agent = ActorCriticAgent
-    
-    # Dumbest hardcoding ive ever done, dont judge me i had no time
-    if agent == MonteCarloAgent:
-        run_training_mc(forcemodel, integrator, ship, agent, training_config)
-    elif agent == ActorCriticAgent:
-        run_training_ac(forcemodel, integrator, ship, agent, training_config)
-    else:
-        print("plop")
+    agent = MonteCarloAgent
+    #agent = ActorCriticAgent
+
+    for seed_id in range(5, 11):
+
+        np.random.seed(seed_id)
+        random.seed(seed_id)
+        torch.manual_seed(seed_id)
+
+        print(f"------------------------------------\n"
+            f"Running Training {seed_id} ...\n"
+            f"------------------------------------\n")
+
+        root_folder = (f"training_logs/mc/mc_{training_config.n_episodes}_{training_config.max_steps}_{seed_id}")
+        #root_folder = (f"training_logs/ac/ac_{training_config.n_episodes}_{training_config.max_steps}_{seed_id}")
+
+        run_training_mc(forcemodel, integrator, ship, agent, training_config, root_folder=root_folder)
+        #run_training_ac(forcemodel, integrator, ship, agent, training_config, root_folder=root_folder)
 
 if __name__ == "__main__":
     main()

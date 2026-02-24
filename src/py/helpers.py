@@ -202,3 +202,42 @@ def append_batch_to_json_list(path, items):
 
     with open(path, "w") as f:
         json.dump(data, f)
+
+
+def rank_runs_by_max_reward(root_folder, n=10):
+    """
+    For each subfolder under root_folder:
+    - Load metadata.json
+    - Sort episodes by reward
+    - Print top N episodes with highest reward
+    """
+
+    for run_folder in sorted(os.listdir(root_folder)):
+        run_path = os.path.join(root_folder, run_folder)
+
+        if not os.path.isdir(run_path):
+            continue
+
+        log_path = os.path.join(run_path, "metadata.json")
+        if not os.path.isfile(log_path):
+            continue
+
+        with open(log_path, "r") as f:
+            data = json.load(f)
+
+        if len(data) == 0:
+            continue
+
+        # Extract episode + reward
+        episodes = [(d["episode"], d["reward"]) for d in data]
+
+        # Sort by reward descending
+        episodes_sorted = sorted(episodes, key=lambda x: x[1], reverse=True)
+
+        print(f"\nRun: {run_folder}")
+        print("-" * 50)
+
+        for ep, reward in episodes_sorted[:n]:
+            print(f"Episode {ep:5d} | Reward: {reward:.6f}")
+
+    print("\nDone.")

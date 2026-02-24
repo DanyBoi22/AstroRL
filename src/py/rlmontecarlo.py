@@ -113,7 +113,7 @@ class MonteCarloAgent:
         return loss.item()
 
 
-def train_mc(env, agent, n_episodes=1000, max_steps=100000, log_every=10, log_states=False, log_n_entries=400):
+def train_mc(env, agent, n_episodes=1000, max_steps=100000, log_every=10, log_states=False, log_n_entries=400, root_folder="training_logs/ac/ac_run"):
     action_buffer = []
     metadata_buffer = []
     reward_buffer = []
@@ -125,7 +125,7 @@ def train_mc(env, agent, n_episodes=1000, max_steps=100000, log_every=10, log_st
     ema_reward = None
 
     # logging
-    folder = f"training_logs/mc_{n_episodes}_{max_steps}"
+    folder = root_folder
     actions_file = os.path.join(folder, "actions.json")
     metadata_file = os.path.join(folder, "metadata.json")
     
