@@ -129,10 +129,10 @@ def main():
     forcemodel = GravityForce
     integrator = VelocityVerlet
     ship = SimpleImpulseShip
-    agent = MonteCarloAgent
-    #agent = ActorCriticAgent
+    #agent = MonteCarloAgent
+    agent = ActorCriticAgent
 
-    for seed_id in range(5, 11):
+    for seed_id in range(1, 11):
 
         np.random.seed(seed_id)
         random.seed(seed_id)
@@ -142,11 +142,14 @@ def main():
             f"Running Training {seed_id} ...\n"
             f"------------------------------------\n")
 
-        root_folder = (f"training_logs/mc/mc_{training_config.n_episodes}_{training_config.max_steps}_{seed_id}")
-        #root_folder = (f"training_logs/ac/ac_{training_config.n_episodes}_{training_config.max_steps}_{seed_id}")
-
-        run_training_mc(forcemodel, integrator, ship, agent, training_config, root_folder=root_folder)
-        #run_training_ac(forcemodel, integrator, ship, agent, training_config, root_folder=root_folder)
+        if agent == MonteCarloAgent:
+            root_folder = (f"training_logs/mc/mc_{training_config.n_episodes}_{training_config.max_steps}_{seed_id}")
+            run_training_mc(forcemodel, integrator, ship, agent, training_config, root_folder=root_folder)
+        elif agent == ActorCriticAgent:
+            root_folder = (f"training_logs/ac/ac_{training_config.n_episodes}_{training_config.max_steps}_{seed_id}")
+            run_training_ac(forcemodel, integrator, ship, agent, training_config, root_folder=root_folder)
+        else : 
+            print("Plop")
 
 if __name__ == "__main__":
     main()
