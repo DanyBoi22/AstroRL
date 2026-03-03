@@ -1,10 +1,26 @@
 # AstroRL
-This project is ment to explore different RL algorithms for calculation optimal orbits between celestial bodies.
+This project is meant to explore different reinforcement learning algorithms in orbital mechanics under realistic physical simulation. 
+The environment is a custom-made implementation of an N-body simulation. The programming language used is Python, with Jupyter Notebook utilized for visualization and analysis.
 
-The simulation for the celestial bodies is a homemade implementation of N-Body simulation. The mprogramming language is Python utilizing Jupyter-Notebook.
+## File Structure
+- *`gifs/`* - Contains animations of simulation and training runs
+- *`logs/`* - Contains log files from simulations and training runs
+- *`pics/`* - Contains images used for visualization and analysis
+- *`src/`* - Contains all source code
+    - *`jupyter/`* - Jupyter notebooks with executable scenarios, visualization, and analysis scripts
+    - *`py/`* - Python scripts required for running simulations and training 
 
 ## Simulation
-### Problems
-- A single timestep for all bodies. But a fine timesteps are crucial for very fast, very close moving objects. For better accuracy need to implement relative timestep depending on period or speed of an object.
+The project uses a custom-built N-body orbital mechanics simulator written in Python. The environment models gravitational interactions between multiple bodies under realistic physical dynamics. Numerical integration is applied to update positions, velocities and accelerations over time, allowing stable orbit propagation and physically consistent trajectories. The environment is deterministic and fully physics-based, making it suitable for evaluating RL behavior under realistic constraints.
 
-- Better initial configuration. At the moment the intial simulation parameters assume all bodies are aligned at t=0 and their movement vector is perpendicular to the alignemnt. The numbers are textbook numbers. The problem is that he textbook numbers use different inertial systems. For example for correct real life geo orbits the initial parameters must be corrected for earths frame of reference.
+## Algorithms
+The project evaluates two reinforcement learning approaches for continuous control in orbital mechanics: 
+- Monte Carlo REINFORCE
+- Advantage Actor-Critic
+
+The focus is on comparing learning stability, convergence speed, fuel efficiency, and orbital accuracy under identical physical simulation conditions.
+
+## Quick Start
+To explore and understand the simulation environment, open and experiment with the notebook *`astrosim.ipynb`*. This notebook allows you to visualize orbital dynamics and interact directly with the physical simulation.
+
+To run reinforcement learning training, configure the desired parameters in the script *`astrorl.py`* and execute it. The script initializes the environment and starts the training process. Log files are saved in the same directory as the script and can later be analyzed using the Jupyter notebook.
